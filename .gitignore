@@ -6,5 +6,6 @@ checkpoints/
 *.pyc
 *.ipynb
 *.csv
+*.zip
 koran.vec
 desktop.ini

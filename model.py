@@ -29,7 +29,7 @@ class SiameseBiLSTM():
     def __build_front_layers(self, input_layer):
         encoded_layer = Embedding(len(self.embeddings), self.embedding_dim, weights=[self.embeddings], 
                                       input_length=self.max_seq_len, trainable=False)(input_layer)
-        lstm_layer = Bidirectional(LSTM(self.num_lstm, return_sequences=True))(encoded_layer)
+        lstm_layer = Bidirectional(LSTM(self.num_lstm, return_sequences=False))(encoded_layer)
         output_layer = GlobalMaxPool1D()(lstm_layer)
 
         return output_layer
@@ -89,12 +89,21 @@ class SiameseBiLSTM():
         print('START TESTING ... ')
         test_start_time = time()
         result = model.evaluate([X_test['left'], X_test['right']], Y_test)
-        print("Testing time finished.\n in {}".format(datetime.timedelta(seconds=time()-test_start_time)))
-
         raw_pred = model.predict([X_test['left'], X_test['right']])
         Y_pred = rescale_predictions(raw_pred)
+        print("Testing time finished.\n in {}".format(datetime.timedelta(seconds=time()-test_start_time)))
 
         TN, FP, FN, TP = confusion_matrix_m(Y_test, Y_pred)
+
+        accuracy = (TP + TN) / (TP + TN + FP + FN)
+        precision = TP / (TP + FP)
+        recall = TP / (TP + FN)
+        f1_score = 2 * ((precision * recall)/(precision + recall))
+
+        result[1] = accuracy
+        result[2] = f1_score
+        result[3] = precision
+        result[4] = recall
 
         print('PACK UP ALL RESULTS ... ')
 
