@@ -29,7 +29,7 @@ class SiameseBiLSTM():
     def __build_front_layers(self, input_layer):
         encoded_layer = Embedding(len(self.embeddings), self.embedding_dim, weights=[self.embeddings], 
                                       input_length=self.max_seq_len, trainable=False)(input_layer)
-        lstm_layer = Bidirectional(LSTM(self.num_lstm, return_sequences=False))(encoded_layer)
+        lstm_layer = Bidirectional(LSTM(self.num_lstm, return_sequences=True))(encoded_layer)
         output_layer = GlobalMaxPool1D()(lstm_layer)
 
         return output_layer
