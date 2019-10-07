@@ -20,6 +20,10 @@ MAX_SEQ_LEN = int(os.getenv('MAX_SEQ_LEN'))
 VAL_SIZE = float(os.getenv('VAL_SIZE'))
 NUM_LSTM = int(os.getenv('NUM_LSTM'))
 NUM_HIDDEN = int(os.getenv('NUM_HIDDEN'))
+LSTM_DROPOUT = float(os.getenv('LSTM_DROPOUT'))
+HIDDEN_DROPOUT = float(os.getenv('HIDDEN_DROPOUT'))
+LEARNING_RATE = float(os.getenv('LEARNING_RATE'))
+PATIENCE = int(os.getenv('PATIENCE'))
 EPOCHS = int(os.getenv('EPOCHS'))
 BATCH_SIZE = int(os.getenv('BATCH_SIZE'))
 
@@ -44,7 +48,7 @@ if __name__ == "__main__":
     print('FINISH DATA PREPARATION \n')
 
     print('INITIALIZE MODEL ... ')
-    model = SiameseBiLSTM(embeddings, EMBEDDING_DIM, MAX_SEQ_LEN, NUM_LSTM, NUM_HIDDEN, EPOCHS, BATCH_SIZE)
+    model = SiameseBiLSTM(embeddings, EMBEDDING_DIM, MAX_SEQ_LEN, NUM_LSTM, NUM_HIDDEN, EPOCHS, BATCH_SIZE, LSTM_DROPOUT, HIDDEN_DROPOUT, LEARNING_RATE, PATIENCE)
 
     model_trained, model_path, checkpoint_dir, results = model.train(X_train, X_val, X_test, Y_train, Y_val, Y_test)
 

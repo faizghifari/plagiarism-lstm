@@ -8,7 +8,7 @@ from time import time
 from keras.preprocessing.sequence import pad_sequences
 from keras.models import Model
 from keras.layers import Input, Embedding, LSTM, Lambda, Dropout, Dense, Bidirectional, GlobalMaxPool1D, GlobalMaxPool2D, Activation
-from keras.optimizers import Adadelta
+from keras.optimizers import Adadelta, Nadam
 from keras.callbacks import ModelCheckpoint, EarlyStopping
 from keras.layers.normalization import BatchNormalization
 from keras.layers.merge import concatenate
@@ -17,19 +17,23 @@ from keras.models import load_model
 from evaluation import precision_m, recall_m, f1_m, confusion_matrix_m, rescale_predictions, eval_summary
 
 class SiameseBiLSTM():
-    def __init__(self, embeddings, embedding_dim, max_seq_len, num_lstm, num_hidden, epochs, batch_size):
+    def __init__(self, embeddings, embedding_dim, max_seq_len, num_lstm, num_hidden, epochs, batch_size, lstm_dropout, hidden_dropout, learning_rate, patience):
         self.embeddings = embeddings
         self.embedding_dim = embedding_dim
         self.max_seq_len = max_seq_len
         self.num_lstm = num_lstm
         self.num_hidden = num_hidden
+        self.lstm_dropout = lstm_dropout
+        self.hidden_dropout = hidden_dropout
+        self.learning_rate = learning_rate
+        self.patience = patience
         self.epochs = epochs
         self.batch_size = batch_size
     
     def __build_front_layers(self, input_layer):
         encoded_layer = Embedding(len(self.embeddings), self.embedding_dim, weights=[self.embeddings], 
                                       input_length=self.max_seq_len, trainable=False)(input_layer)
-        lstm_layer = Bidirectional(LSTM(self.num_lstm, return_sequences=True))(encoded_layer)
+        lstm_layer = Bidirectional(LSTM(self.num_lstm, recurrent_dropout=self.lstm_dropout, return_sequences=True))(encoded_layer)
         output_layer = GlobalMaxPool1D()(lstm_layer)
 
         return output_layer
@@ -45,15 +49,15 @@ class SiameseBiLSTM():
         # Merge layers
         merged = concatenate([left_output, right_output])
         merged = BatchNormalization()(merged)
-        merged = Dropout(0.5)(merged)
+        merged = Dropout(self.hidden_dropout)(merged)
         merged = Dense(self.num_hidden)(merged)
         merged = BatchNormalization()(merged)
         merged = Activation('relu')(merged)
-        merged = Dropout(0.5)(merged)
-        merged = Dense(self.num_hidden * 2)(merged)
-        merged = BatchNormalization()(merged)
-        merged = Activation('relu')(merged)
-        merged = Dropout(0.5)(merged)
+        merged = Dropout(self.hidden_dropout)(merged)
+        # merged = Dense(self.num_hidden * 2)(merged)
+        # merged = BatchNormalization()(merged)
+        # merged = Activation('relu')(merged)
+        # merged = Dropout(self.hidden_dropout)(merged)
         preds = Dense(1, activation='sigmoid')(merged)
 
         model = Model(inputs=[left_input, right_input], outputs=preds)
@@ -62,9 +66,11 @@ class SiameseBiLSTM():
 
         return model
     
-    def train(self, X_train, X_val, X_test, Y_train, Y_val, Y_test, optimizer='nadam', loss='binary_crossentropy'):
+    def train(self, X_train, X_val, X_test, Y_train, Y_val, Y_test, loss='binary_crossentropy'):
         model = self.__build_model()
-        model.compile(loss=loss, optimizer=optimizer, metrics=['accuracy', f1_m, precision_m, recall_m])
+        nadam = Nadam(learning_rate=self.learning_rate)
+
+        model.compile(loss=loss, optimizer=nadam, metrics=['accuracy', f1_m, precision_m, recall_m])
 
         STAMP = 'lstm_%d_%d' % (self.num_lstm, self.num_hidden)
         checkpoint_dir = './checkpoints/' + str(int(time())) + '/'
@@ -75,7 +81,7 @@ class SiameseBiLSTM():
         model_path = checkpoint_dir + STAMP + '.h5'
 
         model_checkpoint = ModelCheckpoint(model_path, save_best_only=True, save_weights_only=False)
-        early_stopping = EarlyStopping(monitor='val_loss', patience=3)
+        early_stopping = EarlyStopping(monitor='val_loss', patience=self.patience)
 
         print('START TRAINING ... ')
         training_start_time = time()
