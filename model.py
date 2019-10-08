@@ -13,6 +13,7 @@ from keras.callbacks import ModelCheckpoint, EarlyStopping
 from keras.layers.normalization import BatchNormalization
 from keras.layers.merge import concatenate
 from keras.models import load_model
+from keras.backend.tensorflow_backend import set_session
 
 from evaluation import precision_m, recall_m, f1_m, confusion_matrix_m, rescale_predictions, eval_summary
 
@@ -30,6 +31,13 @@ class SiameseBiLSTM():
         self.epochs = epochs
         self.batch_size = batch_size
     
+    def __set_gpu_option(self, which_gpu, fraction_memory):
+        config = tf.ConfigProto()
+        config.gpu_options.per_process_gpu_memory_fraction = fraction_memory
+        config.gpu_options.visible_device_list = which_gpu
+        set_session(tf.Session(config=config))
+        return
+
     def __build_front_layers(self, input_layer):
         encoded_layer = Embedding(len(self.embeddings), self.embedding_dim, weights=[self.embeddings], 
                                       input_length=self.max_seq_len, trainable=False)(input_layer)
@@ -67,6 +75,8 @@ class SiameseBiLSTM():
         return model
     
     def train(self, X_train, X_val, X_test, Y_train, Y_val, Y_test, loss='binary_crossentropy'):
+        self.__set_gpu_option('1', 0.5)
+        
         model = self.__build_model()
         nadam = Nadam(learning_rate=self.learning_rate)
 
