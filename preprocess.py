@@ -6,8 +6,29 @@ from gensim.models import KeyedVectors
 from sklearn.model_selection import train_test_split
 from keras.preprocessing.sequence import pad_sequences
 
+def __load_stopwords(STOPWORDS_FILE):
+    stopwords = set()
+    with open(STOPWORDS_FILE, 'r') as f:
+        for line in f:
+            stopwords.add(line.strip().lower())
+    return stopwords
+
+def __is_ok_word(word):
+    alphanumeric = set('abcdefghijklmnopqrstuvwxyz0123456789')
+    for c in word:
+        if c in alphanumeric:
+            return True
+    return False
+
+def __remove_stopwords(stopwords, query):
+    q_split = query.split()
+    result = [w for w in q_split if (w not in stopwords) and (__is_ok_word(w))]
+    return ' '.join(result)
+
 def __normalize_t2w(text):
+    stopwords = __load_stopwords('./data/stopwords.txt')
     text = re.sub(r'[^\w]', ' ', text)
+    text = __remove_stopwords(stopwords, text)
     text = text.lower()
     text = ' '.join(text.split())
     

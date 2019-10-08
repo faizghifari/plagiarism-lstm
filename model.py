@@ -62,10 +62,6 @@ class SiameseBiLSTM():
         merged = BatchNormalization()(merged)
         merged = Activation('relu')(merged)
         merged = Dropout(self.hidden_dropout)(merged)
-        # merged = Dense(self.num_hidden * 2)(merged)
-        # merged = BatchNormalization()(merged)
-        # merged = Activation('relu')(merged)
-        # merged = Dropout(self.hidden_dropout)(merged)
         preds = Dense(1, activation='sigmoid')(merged)
 
         model = Model(inputs=[left_input, right_input], outputs=preds)
@@ -75,8 +71,8 @@ class SiameseBiLSTM():
         return model
     
     def train(self, X_train, X_val, X_test, Y_train, Y_val, Y_test, loss='binary_crossentropy'):
-        self.__set_gpu_option('1', 0.5)
-        
+        # self.__set_gpu_option('0', 0.9)
+
         model = self.__build_model()
         nadam = Nadam(learning_rate=self.learning_rate)
 

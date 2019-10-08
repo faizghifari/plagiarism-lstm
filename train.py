@@ -48,7 +48,8 @@ if __name__ == "__main__":
     print('FINISH DATA PREPARATION \n')
 
     print('INITIALIZE MODEL ... ')
-    model = SiameseBiLSTM(embeddings, EMBEDDING_DIM, MAX_SEQ_LEN, NUM_LSTM, NUM_HIDDEN, EPOCHS, BATCH_SIZE, LSTM_DROPOUT, HIDDEN_DROPOUT, LEARNING_RATE, PATIENCE)
+    model = SiameseBiLSTM(embeddings, EMBEDDING_DIM, MAX_SEQ_LEN, NUM_LSTM, NUM_HIDDEN, EPOCHS, BATCH_SIZE, 
+                          LSTM_DROPOUT, HIDDEN_DROPOUT, LEARNING_RATE, PATIENCE)
 
     model_trained, model_path, checkpoint_dir, results = model.train(X_train, X_val, X_test, Y_train, Y_val, Y_test)
 
