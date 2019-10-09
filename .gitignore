@@ -7,5 +7,6 @@ checkpoints/
 *.ipynb
 *.csv
 *.zip
+.env
 koran.vec
 desktop.ini
