@@ -25,26 +25,27 @@ def __remove_stopwords(stopwords, query):
     result = [w for w in q_split if (w not in stopwords) and (__is_ok_word(w))]
     return ' '.join(result)
 
-def __normalize_t2w(text):
+def __normalize_t2w(text, remove_stopwords):
     stopwords = __load_stopwords('./data/stopwords.txt')
     text = re.sub(r'[^\w]', ' ', text)
-    text = __remove_stopwords(stopwords, text)
+    if remove_stopwords :
+        text = __remove_stopwords(stopwords, text)
     text = text.lower()
     text = ' '.join(text.split())
     
     return text.split()
 
-def build_vocab_and_transform(train_df, test_df, columns, w2v_path):
+def build_vocab_and_transform(df, columns, w2v_path, remove_stopwords):
     w2v = KeyedVectors.load_word2vec_format(w2v_path, binary=True)
 
     vocab = dict()
     inv_vocab = ['<UNK>']
 
-    for dataset in [train_df, test_df]:
+    for dataset in [df]:
         for index, row in dataset.iterrows():
             for col in columns:
                 t2n = []
-                text = __normalize_t2w(row[col])
+                text = __normalize_t2w(row[col], remove_stopwords)
                 for word in text:
                     if word not in w2v.vocab:
                         continue
@@ -57,7 +58,7 @@ def build_vocab_and_transform(train_df, test_df, columns, w2v_path):
                         
                 dataset.set_value(index, col, t2n)
     
-    return train_df, test_df, vocab, inv_vocab, w2v
+    return df, vocab, inv_vocab, w2v
 
 def build_embeddings(w2v, embedding_dim, vocab):
     embeddings = 1 * np.random.randn(len(vocab) + 1, embedding_dim)

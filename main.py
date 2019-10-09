@@ -35,14 +35,12 @@ if __name__ == "__main__":
 
     columns = ['generated_text', 'compared_text']
 
-    print('BUILD VOCABULARY AND TRANSFORM DATA ... ')
-    train_df, test_df, vocab, inv_vocab, w2v = build_vocab_and_transform(train_df, test_df, columns, WORD2VEC_PATH)
+    print('BUILD VOCABULARY AND TRANSFORM TRAIN DATA ... ')
+    train_df, vocab, inv_vocab, w2v = build_vocab_and_transform(train_df, columns, WORD2VEC_PATH, True)
     print('BUILD EMBEDDINGS ... ')
     embeddings = build_embeddings(w2v, EMBEDDING_DIM, vocab)
     print('BUILD TRAIN DATA ... ')
     X_train, X_val, Y_train, Y_val = build_train_data(train_df, columns, VAL_SIZE)
-    print('BUILD TEST DATA ... ')
-    X_test, Y_test = build_test_data(test_df, MAX_SEQ_LEN)
     print('PAD DATA ... ')
     X_train, X_val = build_padded_data(X_train, X_val, MAX_SEQ_LEN)
     print('FINISH DATA PREPARATION \n')
@@ -51,7 +49,14 @@ if __name__ == "__main__":
     model = SiameseBiLSTM(embeddings, EMBEDDING_DIM, MAX_SEQ_LEN, NUM_LSTM, NUM_HIDDEN, EPOCHS, BATCH_SIZE, 
                           LSTM_DROPOUT, HIDDEN_DROPOUT, LEARNING_RATE, PATIENCE)
 
-    model_trained, model_path, checkpoint_dir, results = model.train(X_train, X_val, X_test, Y_train, Y_val, Y_test)
+    model_path, checkpoint_dir = model.train(X_train, X_val, Y_train, Y_val)
+
+    print('BUILD VOCABULARY AND TRANSFORM TEST DATA ... ')
+    test_df, vocab, inv_vocab, w2v = build_vocab_and_transform(test_df, columns, WORD2VEC_PATH, True)
+    print('BUILD TEST DATA ... ')
+    X_test, Y_test = build_test_data(test_df, MAX_SEQ_LEN)
+
+    results = model.test(model_path, X_test, Y_test)
 
     file_obj = open(checkpoint_dir + '.json', 'w')
     json.dump(results, file_obj)

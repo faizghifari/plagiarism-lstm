@@ -6,19 +6,19 @@ import keras.backend as K
 
 from time import time
 from keras.preprocessing.sequence import pad_sequences
-from keras.models import Model
-from keras.layers import Input, Embedding, LSTM, Lambda, Dropout, Dense, Bidirectional, GlobalMaxPool1D, GlobalMaxPool2D, Activation
-from keras.optimizers import Adadelta, Nadam
+from keras.models import Model, load_model
+from keras.layers import Input, Embedding, LSTM, Dropout, Dense, Bidirectional, GlobalMaxPool1D, Activation
+from keras.optimizers import Nadam
 from keras.callbacks import ModelCheckpoint, EarlyStopping
 from keras.layers.normalization import BatchNormalization
 from keras.layers.merge import concatenate
-from keras.models import load_model
 from keras.backend.tensorflow_backend import set_session
 
 from evaluation import precision_m, recall_m, f1_m, confusion_matrix_m, rescale_predictions, eval_summary
 
 class SiameseBiLSTM():
-    def __init__(self, embeddings, embedding_dim, max_seq_len, num_lstm, num_hidden, epochs, batch_size, lstm_dropout, hidden_dropout, learning_rate, patience):
+    def __init__(self, embeddings, embedding_dim, max_seq_len, num_lstm, num_hidden, epochs, batch_size, lstm_dropout, 
+                 hidden_dropout, learning_rate, patience):
         self.embeddings = embeddings
         self.embedding_dim = embedding_dim
         self.max_seq_len = max_seq_len
@@ -63,6 +63,10 @@ class SiameseBiLSTM():
         merged = BatchNormalization()(merged)
         merged = Activation('relu')(merged)
         merged = Dropout(self.hidden_dropout)(merged)
+        merged = Dense(self.num_hidden)(merged)
+        merged = BatchNormalization()(merged)
+        merged = Activation('relu')(merged)
+        merged = Dropout(self.hidden_dropout)(merged)
         preds = Dense(1, activation='sigmoid')(merged)
 
         model = Model(inputs=[left_input, right_input], outputs=preds)
@@ -71,7 +75,7 @@ class SiameseBiLSTM():
 
         return model
     
-    def train(self, X_train, X_val, X_test, Y_train, Y_val, Y_test, loss='binary_crossentropy'):
+    def train(self, X_train, X_val, Y_train, Y_val, loss='binary_crossentropy'):
         # self.__set_gpu_option('0', 0.9)
 
         model = self.__build_model()
@@ -79,7 +83,7 @@ class SiameseBiLSTM():
 
         model.compile(loss=loss, optimizer=nadam, metrics=['accuracy', f1_m, precision_m, recall_m])
 
-        STAMP = 'lstm_%d_%d_%d_%f_%d_%f' % (self.batch_size, self.max_seq_len, self.num_lstm, self.lstm_dropout, self.num_hidden, self.hidden_dropout)
+        STAMP = 'lstm_%d_%d_%d_%d' % (self.batch_size, self.max_seq_len, self.num_lstm, self.num_hidden)
         checkpoint_dir = './checkpoints/' + str(int(time())) + '/'
 
         if not os.path.exists(checkpoint_dir):
@@ -93,12 +97,21 @@ class SiameseBiLSTM():
         print('START TRAINING ... ')
         training_start_time = time()
 
-        model_trained = model.fit([X_train['left'], X_train['right']], Y_train, batch_size=self.batch_size, 
+        model.fit([X_train['left'], X_train['right']], Y_train, batch_size=self.batch_size, 
                                   epochs=self.epochs, validation_data=([X_val['left'], X_val['right']], Y_val), 
                                   callbacks=[early_stopping, model_checkpoint])
 
         print("Training time finished.\n{} epochs in {}".format(self.epochs, datetime.timedelta(seconds=time()-training_start_time)))
 
+        return model_path, checkpoint_dir + STAMP
+    
+    def test(self, model_path, X_test, Y_test):
+        model = load_model(model_path, custom_objects={
+                                "f1_m": f1_m,
+                                "precision_m": precision_m,
+                                "recall_m": recall_m
+                          })
+        
         print('START TESTING ... ')
         test_start_time = time()
         result = model.evaluate([X_test['left'], X_test['right']], Y_test)
@@ -133,61 +146,5 @@ class SiameseBiLSTM():
             }
         }
 
-        return model_trained, model_path, checkpoint_dir + STAMP, results
-    
-    def update(self, model_path, X_train, Y_train, X_test, Y_test):
-        model = load_model()
+        return results
 
-        model_file_name = model_path.split('/')[-1]
-        new_model_checkpoint_path  = model_path.split('/')[:-2] + str(int(time.time())) + '/' 
-
-        new_model_path = new_model_checkpoint_path + model_file_name
-
-        model_checkpoint = ModelCheckpoint(new_model_path, save_best_only=True, save_weights_only=False)
-        early_stopping = EarlyStopping(monitor='val_loss', patience=self.patience)
-
-        print('START TRAINING ... ')
-        training_start_time = time()
-
-        model_trained = model.fit([X_train['left'], X_train['right']], Y_train, batch_size=self.batch_size, 
-                                  epochs=self.epochs, validation_data=([X_val['left'], X_val['right']], Y_val), 
-                                  callbacks=[early_stopping, model_checkpoint])
-
-        print("Training time finished.\n{} epochs in {}".format(self.epochs, datetime.timedelta(seconds=time()-training_start_time)))
-
-        print('START TESTING ... ')
-        test_start_time = time()
-        result = model.evaluate([X_test['left'], X_test['right']], Y_test)
-        raw_pred = model.predict([X_test['left'], X_test['right']])
-        Y_pred = rescale_predictions(raw_pred)
-        print("Testing time finished.\n in {}".format(datetime.timedelta(seconds=time()-test_start_time)))
-
-        TN, FP, FN, TP = confusion_matrix_m(Y_test, Y_pred)
-
-        accuracy = (TP + TN) / (TP + TN + FP + FN)
-        precision = TP / (TP + FP)
-        recall = TP / (TP + FN)
-        f1_score = 2 * ((precision * recall)/(precision + recall))
-
-        result[1] = accuracy
-        result[2] = f1_score
-        result[3] = precision
-        result[4] = recall
-
-        print('PACK UP ALL RESULTS ... ')
-
-        print("Results : ", result)
-
-        summary = eval_summary(result, model.metrics_names)
-
-        results = {
-            'summary': summary,
-            'details': {
-                'true_positive': int(TP),
-                'true_negative': int(TN),
-                'false_positive': int(FP),
-                'false_negative': int(FN)
-            }
-        }
-
-        return model_trained, model_path, new_model_checkpoint_path, results
